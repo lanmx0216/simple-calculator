@@ -1,1 +1,99 @@
-
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1f3a">
+  <meta name="description" content="簡潔、易用的線上計算機。">
+  <title>計算機</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif; color: #172033; background: #f3f6fb; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; }
+    main { width: min(100%, 380px); }
+    .brand { margin: 0 0 14px 4px; color: #64748b; font-size: 14px; letter-spacing: .08em; }
+    .calculator { overflow: hidden; border: 1px solid #e2e8f0; border-radius: 28px; background: #fff; box-shadow: 0 24px 70px #0b1f3a18; }
+    .screen { min-height: 148px; padding: 26px 24px 20px; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; background: #0b1f3a; color: #fff; }
+    .history { min-height: 22px; color: #aabbd0; font-size: 14px; overflow-wrap: anywhere; }
+    output { width: 100%; margin-top: 8px; text-align: right; font-size: clamp(38px, 12vw, 54px); font-weight: 500; letter-spacing: -.04em; overflow-wrap: anywhere; }
+    .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 18px; }
+    button { min-height: 64px; border: 0; border-radius: 18px; background: #f1f5f9; color: #172033; font: inherit; font-size: 21px; cursor: pointer; transition: transform .08s, background .15s; }
+    button:hover { background: #e6edf6; }
+    button:active { transform: scale(.96); }
+    button:focus-visible { outline: 3px solid #6d9fe8; outline-offset: 2px; }
+    .utility { color: #294a70; background: #eaf0f8; }
+    .operator { color: #12345a; background: #e8eef7; }
+    .equals { grid-row: span 2; color: #fff; background: #174a82; }
+    .equals:hover { background: #123d6d; }
+    .zero { grid-column: span 2; }
+    @media (max-width: 420px) { body { padding: 14px; } .keys { gap: 8px; padding: 14px; } button { min-height: 60px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="brand">簡單計算機</p>
+    <section class="calculator" aria-label="計算機">
+      <div class="screen" aria-live="polite">
+        <div class="history" id="history"></div>
+        <output id="display" aria-label="目前數值">0</output>
+      </div>
+      <div class="keys">
+        <button class="utility" data-action="clear" aria-label="全部清除">AC</button>
+        <button class="utility" data-action="sign" aria-label="正負切換">±</button>
+        <button class="utility" data-action="percent" aria-label="百分比">%</button>
+        <button class="operator" data-op="÷" aria-label="除以">÷</button>
+        <button data-digit="7">7</button><button data-digit="8">8</button><button data-digit="9">9</button><button class="operator" data-op="×" aria-label="乘以">×</button>
+        <button data-digit="4">4</button><button data-digit="5">5</button><button data-digit="6">6</button><button class="operator" data-op="−" aria-label="減">−</button>
+        <button data-digit="1">1</button><button data-digit="2">2</button><button data-digit="3">3</button><button class="operator" data-op="+" aria-label="加">+</button>
+        <button class="zero" data-digit="0">0</button><button data-action="decimal" aria-label="小數點">.</button><button class="equals" data-action="equals" aria-label="等於">=</button>
+      </div>
+    </section>
+  </main>
+  <script>
+    const display = document.querySelector('#display');
+    const history = document.querySelector('#history');
+    let current = '0', stored = null, operator = null, fresh = false;
+    const render = () => { display.value = current; display.textContent = current; };
+    function calculate(a, b, op) {
+      if (op === '+') return a + b;
+      if (op === '−') return a - b;
+      if (op === '×') return a * b;
+      if (op === '÷') return b === 0 ? '錯誤' : a / b;
+    }
+    document.querySelector('.keys').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.digit !== undefined) {
+        if (fresh || current === '錯誤') { current = b.dataset.digit; fresh = false; }
+        else current = current === '0' ? b.dataset.digit : current + b.dataset.digit;
+      } else if (b.dataset.action === 'decimal') {
+        if (fresh || current === '錯誤') { current = '0'; fresh = false; }
+        if (!current.includes('.')) current += '.';
+      } else if (b.dataset.action === 'clear') {
+        current = '0'; stored = null; operator = null; fresh = false; history.textContent = '';
+      } else if (b.dataset.action === 'sign') {
+        if (current !== '0' && current !== '錯誤') current = current.startsWith('-') ? current.slice(1) : '-' + current;
+      } else if (b.dataset.action === 'percent') {
+        if (current !== '錯誤') current = String(Number(current) / 100);
+      } else if (b.dataset.op) {
+        if (current === '錯誤') return;
+        if (operator && !fresh) { const result = calculate(stored, Number(current), operator); current = String(result); }
+        stored = Number(current); operator = b.dataset.op; fresh = true; history.textContent = `${current} ${operator}`;
+      } else if (b.dataset.action === 'equals' && operator && stored !== null) {
+        const left = stored, right = Number(current), op = operator;
+        const result = calculate(left, right, op);
+        history.textContent = `${left} ${op} ${right} =`;
+        current = typeof result === 'number' && Number.isFinite(result) ? String(Number(result.toPrecision(12))) : String(result);
+        stored = null; operator = null; fresh = true;
+      }
+      render();
+    });
+    document.addEventListener('keydown', e => {
+      const map = { '*': '×', '/': '÷', '-': '−', '+': '+', Enter: 'equals', '=': 'equals', Escape: 'clear', '%': 'percent', '.': 'decimal' };
+      if (/^[0-9]$/.test(e.key)) document.querySelector(`[data-digit="${e.key}"]`)?.click();
+      else if (map[e.key] === 'equals') { e.preventDefault(); document.querySelector('[data-action="equals"]').click(); }
+      else if (map[e.key] === 'clear' || map[e.key] === 'percent' || map[e.key] === 'decimal') document.querySelector(`[data-action="${map[e.key]}"]`)?.click();
+      else if (map[e.key]) document.querySelector(`[data-op="${map[e.key]}"]`)?.click();
+    });
+  </script>
+</body>
+</html>
